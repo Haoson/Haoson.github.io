@@ -1,0 +1,14 @@
+markdown: rdiscount
+permalink: /:title/
+url: http://Haoson.github.io
+name: Haoson的博客
+author: Weiqing Hao
+qq: 1132113499
+email: haoweiqinghaoson@gmail.com
+weibo: 2068614947
+github: Haoson
+duoshuo: haoson
+highlighter: pygments
+safe: true
+paginate: 20
+about: "这里是Haoson 的个人博客，这里主要记录C++相关的内容，也有个人生活方面内容，切换到分类模可以更快地找到感兴趣的内容，欢迎建议、拍砖……"
