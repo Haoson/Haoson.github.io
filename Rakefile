@@ -40,13 +40,13 @@ module JB
   end #Path
 end #JB
 
-# Usage: rake post title="A Title" [name="file name"][ date="2012-02-09"]
+# Usage: rake post title="A Title" [name="file name"] [date="2012-02-09"]
 desc "Begin a new post in #{CONFIG['posts']}"
 task :post do
   abort("rake aborted: '#{CONFIG['posts']}' directory not found.") unless FileTest.directory?(CONFIG['posts'])
   title = ENV["title"] || "new-post"
-  essayname = ENV["name"]||title
-  slug = essayname.downcase.strip.gsub(' ', '-')
+  essayname = ENV["name"] || title
+  slug = essayname.downcase.strip.gsub(' ', '-').gsub(/[^\w-]/, '')
   begin
     date = (ENV['date'] ? Time.parse(ENV['date']) : Time.now).strftime('%Y-%m-%d')
   rescue Exception => e
@@ -61,7 +61,6 @@ task :post do
   puts "Creating new post: #{filename}"
   open(filename, 'w') do |post|
     post.puts "---"
-    post.puts "#{date}"+Time.now.strftime(" %H:%M:%S")
     post.puts "layout: post"
     post.puts "title: \"#{title.gsub(/-/,' ')}\""
     post.puts "categories:"
