@@ -1,4 +1,11 @@
 markdown: rdiscount
+rdiscount:
+  extensions:
+    - autolink      # greedily urlify links
+    - footnotes     # footnotes
+    - smart         # typographic substitutions with SmartyPants
+    - generate_toc  # Enable Table Of Contents generation
+  toc_token: "[TOC]"
 permalink: /:title/
 url: http://Haoson.github.io
 name: Haoson的博客
