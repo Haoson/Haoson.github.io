@@ -135,7 +135,34 @@ tags:
 
 
 ### 5. placement new/delete底层实现
+　　placement new是重载operator new的一个标准、全局的版本，它不能被自定义的版本代替（不像普通的operator new和operator delete能够被替换成用户自定义的版本）。看一下placement new的源码如下：
 
+`````C++
+   // Default placement versions of operator new.
+    inline void* operator new(std::size_t, void* __p) _GLIBCXX_USE_NOEXCEPT{ return __p; }
+    inline void* operator new[](std::size_t, void* __p) _GLIBCXX_USE_NOEXCEPT{ return __p; }
+    // Default placement versions of operator delete.
+    inline void operator delete  (void*, void*) _GLIBCXX_USE_NOEXCEPT { }
+    inline void operator delete[](void*, void*) _GLIBCXX_USE_NOEXCEPT { } 
+`````
+
+　　placement new可以实现在ptr所指地址上构建一个对象(通过调用其构造函数),这里的ptr可以指向动态分配的堆上内存，也可以指向栈上内存。一般而言placement new使用场景非常少，它的最简单应用就是可以将对象放置在内存中的特定位置，示例代码如下：
+
+``````C++
+    #include <new>        // Must #include this to use "placement new"
+    #include "Fred.h"     // Declaration of class Fred
+    void someCode(){
+        char memory[sizeof(Fred)];
+        Fred* f = new(memory) Fred();
+        //do something
+        f->~Fred();   // 显示调用对象的析构函数
+    } 
+``````
+
+　　一般来说，我们应该尽可能不使用placement new，除非我们真的很关心创建的对象在内存中的位置，for example，when your hardware has a memory-mapped I/O timer device, and you want to place a Clock object at that memory location.[^2]。还有，我们使用placement new构造对象，当对象调用结束后，我们需要显示的调用对象的析构函数。最最重要的是，一旦我们使用operator new之后，也就意味着我们接管了传给placement new的指针所指的内存区块的职责，这里有两个职责，一是内存区域是否足够容纳对象；二是如果区域是否满足字节对齐（如果对象需要字节对齐）。
+
+　　还要注意的是，在C++标准中，对于placement operator new []有如下的说明： placement operator new[] needs implementation-defined amount of additional storage to save a size of array. 所以我们必须申请比原始对象大小多出sizeof(int)个字节来存放对象的个数，或者说数组的大小。
 ### 6. array new/delete底层实现
 
 [^1]: 侯捷-《Effective C++》
+[^2]: [What is "placement new" and why would I use it?](http://www.parashift.com/c++-faq/placement-new.html)
