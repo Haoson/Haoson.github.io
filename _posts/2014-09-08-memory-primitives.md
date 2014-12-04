@@ -49,6 +49,46 @@ tags:
     ::operator delete(cptr);
 `````
 
-　　也就是说，调用delete的时候，由两步组成，先调用析构函数，然后释放内存。对于operator new和operator delete的底层实现，下面有介绍。
-    
+　　也就是说，调用delete的时候，由两步组成，先调用析构函数，然后释放内存。
+　　按照上面的叙述，做如下实验验证。
+
+`````C++
+    #include<iostream>
+    using namespace std;
+    struct A{
+        int a;
+        A(int data):a(data){
+            cout<<"A constructor.this pointer="<<this<<endl;
+        }
+        ~A(){
+        cout<<"A destructor.this pointer="<<this<<endl;
+        }
+        void print(){
+        cout<<"a="<<a<<endl;
+        }
+    };
+    int main(int argc,char *argv[]){
+        void* mem = ::operator new(sizeof(A));
+        cout<<"mem address="<<mem<<endl;
+        A* ptr = static_cast<A*>(mem);
+        ptr->A(10);//在vs2013中可以通过编译，gcc中这一句不能通过编译
+        A::A(9);//构造了一个临时变量
+        ptr->print();
+        ptr->~A();
+        ::operator delete(ptr);
+        return 0;
+    }
+`````
+　　程序输出如下(vs2013环境下)：
+
+``````
+    mem address=0x8739008
+    A constructor.this pointer=0x8739008
+    A constructor.this pointer=0xbfda7850
+    A destructor.this pointer=0xbfda7850
+    a=10
+    A destructor.this pointer=0x8739008
+``````
+　　可以看出，operator new分配的那一块内存的起始地址就是this指针的地址。A::A(9);是在栈上分配空间构造了一个临时变量，这个临时变量的生命周期存在于这一个语句，所以程序输出中的第三四句打印了构造和析构两条语句。
 ### 4. operator new/operator delete底层实现
+
