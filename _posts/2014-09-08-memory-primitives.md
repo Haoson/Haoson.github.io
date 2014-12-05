@@ -108,9 +108,13 @@ tags:
         }
         return p;
     }　
+    void operator delete(void* ptr) _NOEXCEPT{
+        if (ptr)
+            ::free(ptr);
+    }
 `````
 
-　　从上述代码中可以看到，operator new实际上会不只一次地尝试着去分配内存，它要在每次失败后调用出错处理函数(如果用户设置了错误处理函数)，还期望出错处理函数能想办法释放别处的内存。只有在指向出错处理函数的指针为空的情况下，operator new才抛出异常。那么首先看看这个handler怎么设置。直接上源码：
+　　从上述代码中可以看到，operator delete实际上只是简单的调用CRT 提供的free来释放内存，operator new调用malloc来分配内存，但是operator new会不只一次地尝试着去分配内存，它要在每次失败后调用出错处理函数(如果用户设置了错误处理函数)，还期望出错处理函数能想办法释放别处的内存。只有在指向出错处理函数的指针为空的情况下，operator new才抛出异常。那么首先看看这个handler怎么设置。直接上源码：
 
 `````C++
     typedef void (*new_handler)();
@@ -163,6 +167,24 @@ tags:
 
 　　还要注意的是，在C++标准中，对于placement operator new []有如下的说明： placement operator new[] needs implementation-defined amount of additional storage to save a size of array. 所以我们必须申请比原始对象大小多出sizeof(int)个字节来存放对象的个数，或者说数组的大小。
 ### 6. array new/delete底层实现
+　　当使用new分配数组的时候，原理基本同new操作符，不过分配内存是调用operator new[]（即array new），array new能被重载，分配完内存之后，在数组里的每一个对象的构造函数都会被调用。这里唯一需要注意的是编译器只会调用无参的构造函数，这里无法通过参数给予对象初值。
 
+　　当delete操作符用于数组时，它为每个数组元素调用析构函数，然后调用operator delete[](即array delete)来释放内存。array delete同样能被重载。
+
+　　对于array new/delete，源码如下：
+
+``````C++
+    void* operator new[] (std::size_t sz) _GLIBCXX_THROW (std::bad_alloc){
+        return ::operator new(sz);
+    }
+    void operator delete[] (void* ptr) _NOEXCEPT{
+        ::operator delete (ptr);
+    }
+``````
+
+　　可以看到，array new/delete底层实质上还是调用operator new/delete来分配空间。
+
+### 7. 总结
+　　这篇博客主要介绍了C++内存分配中的一些基本原语的底层实现和一些要注意的点，下一篇将利用这些原语实现我们自己的内存池。
 [^1]: 侯捷-《Effective C++》
 [^2]: [What is "placement new" and why would I use it?](http://www.parashift.com/c++-faq/placement-new.html)
