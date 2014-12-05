@@ -184,7 +184,11 @@ tags:
 
 　　可以看到，array new/delete底层实质上还是调用operator new/delete来分配空间。
 
-### 7. 总结
-　　这篇博客主要介绍了C++内存分配中的一些基本原语的底层实现和一些要注意的点，下一篇将利用这些原语实现我们自己的内存池。
+### 7. 其他
+　　第一点，从上面的介绍可知，new/delete,operator new/delete或者array new/delete等实质上都是调用malloc/free来分配/释放空间，对于malloc和free的底层实现，后续文章再做分析。
+
+　　第二点，一个小细节，释放空间的时候，我们注意到free只需要一个指针参数，指向要释放的区块的开始地址，那么释放空间的时候怎么知道释放的空间大小呢？这里简单说一下，分配内存的时候，会记录一个cooike，cooike记录了分配内存的大小，一般来说，这个cookie放在区块开始地址的"上面"，释放的时候只需要根据开始地址再向上找4个字节就能得到区块大小...
+### 8. 总结
+　　这篇博客主要介绍了C++内存分配中的一些基本原语的底层实现和一些要注意的点，下一篇我将利用这些原语实现一个自己的内存池。
 [^1]: 侯捷-《Effective C++》
 [^2]: [What is "placement new" and why would I use it?](http://www.parashift.com/c++-faq/placement-new.html)
