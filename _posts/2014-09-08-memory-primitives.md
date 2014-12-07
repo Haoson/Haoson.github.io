@@ -185,10 +185,29 @@ tags:
 　　可以看到，array new/delete底层实质上还是调用operator new/delete来分配空间。
 
 ### 7. 其他
-　　第一点，从上面的介绍可知，new/delete,operator new/delete或者array new/delete等实质上都是调用malloc/free来分配/释放空间，对于malloc和free的底层实现，后续文章再做分析。
+　　第一点，前面提到重载placement new时可能遇到alignment问题，这里强调一下，C++标准里要求了所有的operator new（placement new是重载operator new的一个标准、全局的版本）返回的指针都有适当的对齐（取决于数据类型）。malloc就是在这样的要求下工作，所以令operator new返回一个得自malloc的指针是安全的，那么什么时候会遇到alignment问题呢？举个例子，直接上代码:
 
-　　第二点，一个小细节，释放空间的时候，我们注意到free只需要一个指针参数，指向要释放的区块的开始地址，那么释放空间的时候怎么知道释放的空间大小呢？这里简单说一下，分配内存的时候，会记录一个cooike，cooike记录了分配内存的大小，一般来说，这个cookie放在区块开始地址的"上面"，释放的时候只需要根据开始地址再向上找4个字节就能得到区块大小...
+`````C++
+    static const int cooike = 0xABABABAB;
+    void* operator new(size_t size)throw(bad_alloc){
+        size_t real_size = size+2*sizeof(int);
+        void* mem = malloc(real_size);
+        if(!mem)
+            throw bad_alloc();
+        //将cookie写入到区块的最前面和最后面
+        *(static_cast<int*>(mem)) = cooike;
+        *(reinterpret_cast<int*>(static_cast<unsigned char*>(mem)+real_size-sizeof(int))) = cooike;
+        //返回指针，指向位于第一个cookie之后的内存位置
+        return static_cast<unsigned char*>(mem)+sizeof(int);
+    }
+`````
+
+可以看到上述代码返回的其实并不是一个得自malloc的指针，这个指针可能就是一个没有适当对齐的指针。所以重载operator new（包括placement new）都需要格外小心。
+
+　　第二点，从上面的介绍可知，new/delete,operator new/delete或者array new/delete等实质上都是调用malloc/free来分配/释放空间，对于malloc和free的底层实现，后续文章再做分析。
+
+　　第三点，一个小细节，释放空间的时候，我们注意到free只需要一个指针参数，指向要释放的区块的开始地址，那么释放空间的时候怎么知道释放的空间大小呢？这里简单说一下，分配内存的时候，会记录一个cooike，cooike记录了分配内存的大小，一般来说，这个cookie放在区块开始地址的"上面"，释放的时候只需要根据开始地址再向上找4个字节就能得到区块大小...
 ### 8. 总结
 　　这篇博客主要介绍了C++内存分配中的一些基本原语的底层实现和一些要注意的点，下一篇我将利用这些原语实现一个自己的内存池。
-[^1]: 侯捷-《Effective C++》
+[^1]: 侯捷-《Effective C++》第三版
 [^2]: [What is "placement new" and why would I use it?](http://www.parashift.com/c++-faq/placement-new.html)
