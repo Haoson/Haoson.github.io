@@ -184,6 +184,7 @@ tags:
 
 　　可以看到，array new/delete底层实质上还是调用operator new/delete来分配空间。
 
+　　这里提一个小细节，如果我们new数组之后使用delete ptr;(没有那个中括号)会发生什么呢？从上面的源代码可以看到，array delete底层还是调用::operator delete来释放内存的，参数是指向将要释放的区块的开始地址，所以分配的内存一定是会正确释放的，不可能有内存泄露。前面提到delete数组时候，第一步是为每个数组元素调用析构函数，如果我们delete数组时候忘记写中括号，那么编译器认为这是一个对象，编译器就会调用第一个元素的析构元素，其余元素的析构函数将不会被调用。
 ### 7. 其他
 　　第一点，前面提到重载placement new时可能遇到alignment问题，这里强调一下，C++标准里要求了所有的operator new（placement new是重载operator new的一个标准、全局的版本）返回的指针都有适当的对齐（取决于数据类型）。malloc就是在这样的要求下工作，所以令operator new返回一个得自malloc的指针是安全的，那么什么时候会遇到alignment问题呢？举个例子，直接上代码:
 
