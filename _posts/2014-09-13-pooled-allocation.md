@@ -33,7 +33,7 @@ tags:
         private:
             static Foo* free_list;
             static const int foo_chunk=24;
-            Foo* next;
+            Foo* next; //[2]
     };
 `````
 
@@ -73,8 +73,8 @@ tags:
 ### 3. 分析
 　　上述代码为Foo类重载了operator new和operator delete，对象new的时候使用自由链表一次性分配多个对象(bulk allocation)，然后从"对象池"中取对象给用户，对象delete的时候不直接归还(Caching)，而是将归还的对象挂到自由链表头。
 
-　　对于代码有两点简单说明：<br>
-　　1. [1]处判断size是否与sizeof(Foo)大小是否相同，operator new的参数是由编译器传过来的，为什么这里会出现不一致的情况呢？要注意的是member operator new/delete会被继承
+　　对于代码有一点简单说明：<br>
+　　1. [1]处判断size是否与sizeof(Foo)大小是否相同，operator new的参数是由编译器传过来的，为什么这里会出现不一致的情况呢？要注意的是member operator new/delete会被继承,对子类使用new运算符时，可能会调用父类中定义的operator new()来获取内存。但是，在这里，内存分配的大小，不应该是sizeof(父类)，而是sizeof(子类)。所以为了防止重载operator new/delete给子类带来的副作用，对于子类的内存分配，这里还是交给global operator new处理。<br>
 
 　　做了一个简单测试，性能上(在动态分配大量小对象的时候)确实有了一定提升
 
@@ -82,9 +82,43 @@ tags:
     Begin clock=30000 End clock=70000 1000000 OriginalFoo,take 40000clocks.
     Begin clock=70000 End clock=100000 1000000 Foo,take 30000clocks.
 `````
+　　这里性能上的提升不仅仅是分配和回收的速度变快，也节省了一定的内存空间，前一篇博客原语篇提到new分配内存时，最终还是由malloc来分配，malloc分配空间的时候一般会在原始对象大小上再加一个"cookie"来记录对象大小，per-class allocation实质上是挖一大块空间来自己切割分配，这样当动态分配大量小对象的时候，小对象的"cookie"自然也就节省掉了。但是上述代码为了使用自由链表，引入了一个next指针，空间又浪费了，下面改进章节将会这个指针进行优化。
 
+　　这段代码最大的缺点是永远不会释放空间，而且如果不断创建对象又不释放的话，自由链表会越长越大。如果引入变量记录相关信息，也许可以解决，不过也要考虑花费的代价值不值，毕竟重载operator new/delete就是为了应对特殊场合的，如何取舍还得看具体场景，也许某些场合下完全不释放空间不是问题。
 　　
 ### 4. 改进
-　　//to do
+　　1. 前面提到为了使用自由链表，引入了一个next指针，这个指针就是为了将对象链起来，既然对象已经归还，那么是否可以借用对象的前4个bytes(32位系统上)来作为链接下一个对象的next指针呢？当然是可以的。所以上述代码可以稍加改造。
+
+`````C++
+    #include<cstddef>
+    class Foo{
+        private:
+            union{//匿名union [1]
+                int i;
+                Foo* next;
+            };
+        public:
+            Foo(int x):i(x){}
+            int get(){
+                return i;
+            }
+            static void* operator new(size_t);
+            static void operator delete(void*,size_t);
+        private:
+            static Foo* free_list;
+            static const int foo_chunk=24;
+    };
+`````
+
+　　使用匿名union即完成上述改造，匿名union不用于定义对象,它的成员的名字出现在外围作用域中，也就是声明变量的作用，匿名union仅仅通知编译器它的成员变量共同享一个地址,而变量本身是直接引用的。通过引入匿名union，也就实现了上面说的借用对象本身的内存作为分配器的自由链表的分配指针的功能。
+
+　　2. 如果有很多类都需要重载member operator new的话，那么实现逻辑同上应该是基本一致，从代码的可重用和模块化的角度来说，我们应该将内存分配的功能封装起来，这样每个类就可以重用他们而不用管到底如何实现，这也体现了单一职责原则。改进如下：
+
+`````C++
+    
+`````
+
+
+
 ### 5. 其他
 　　//to do
