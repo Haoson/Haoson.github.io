@@ -112,13 +112,176 @@ tags:
 
 　　使用匿名union即完成上述改造，匿名union不用于定义对象,它的成员的名字出现在外围作用域中，也就是声明变量的作用，匿名union仅仅通知编译器它的成员变量共同享一个地址,而变量本身是直接引用的。通过引入匿名union，也就实现了上面说的借用对象本身的内存作为分配器的自由链表的分配指针的功能。
 
-　　2. 如果有很多类都需要重载member operator new的话，那么实现逻辑同上应该是基本一致，从代码的可重用和模块化的角度来说，我们应该将内存分配的功能封装起来，这样每个类就可以重用他们而不用管到底如何实现，这也体现了单一职责原则。改进如下：
+　　2. 如果有很多类都需要重载member operator new的话，那么实现逻辑同上应该是基本一致，从代码的可重用和模块化的角度来说，我们应该将内存分配的功能封装起来，这样每个类就可以重用他们而不用管到底如何实现，这也体现了单一职责原则。下面实现一个不太复杂的固定大小的内存分配器,设计思想参考MFC的CFixedAlloc。
 
+### 5. 固定大小的内存分配器
 `````C++
-    
+    //memory_pool.h
+    struct MemoryPool{
+        MemoryPool* next;//每次挖一大块内存，当使用完再挖一块，各大块之间通过next指针链接，组成一个自由链表
+        void* data(){//每次挖出的一大块内存的前几个字节放next指针(等价于一个MemoryPool对象大小)，之后的空间才会分配出去
+            return this+1;
+        }
+        static MemoryPool* create(MemoryPool*& head,size_t alloc_size,size_t block_size);
+        void freeDataChain();//释放所有申请的空间
+    };
+    //memory_pool.cpp
+    MemoryPool* MemoryPool::create(MemoryPool*& head,size_t alloc_size,size_t block_size){
+        assert(alloc_size>0 && block_size>0);
+        MemoryPool* p = reinterpret_cast<MemoryPool*>(new char[sizeof(MemoryPool)+alloc_size*block_size]);
+        p->next = head;//新挖出的一大块内存入链
+        head = p;//head作为自由链表的头
+        return p;
+    }
+    void MemoryPool::freeDataChain(){
+        MemoryPool* p = this;
+        MemoryPool* temp;
+        while(p){
+            temp = p->next;
+            char* cptr = reinterpret_cast<char*>(p);
+            delete[] cptr;
+            p = temp;
+        }
+    }
 `````
 
+　　MemoryPool类只负责申请一大块内存并链接起来组成自由链表(把每次申请的一大块内存看做一个节点),create函数具体建立一条自由链表为特定大小(alloc_size)区块服务。
+
+`````C++
+    //fixed_alloc.h
+    #include"memory_pool.h"
+    class FixedAlloc{
+        public:
+            FixedAlloc(size_t nAllocSize,size_t nBlockSize=32);
+            size_t getAllocSize(){
+                return allocSize;
+            }
+            void* allocate();//分配allocSize大小的块
+            void deallocate(void* p);//回收alloc出去的内存
+            void deallocateAll();//释放所有从这个alloc分配出去的内存
+            ~FixedAlloc();
+        protected:
+            union Obj{// [1]
+                union Obj* free_list_link;
+            };
+            size_t allocSize;//分配块的大小
+            size_t blockSize;//每次申请的块的数目
+            MemoryPool* blocks_head;//所有区块组成的自由链表头
+            Obj* free_block_head;//未分配出去的区块头
+    };
+    //fixed_alloc.cpp
+    FixedAlloc::FixedAlloc(size_t nAllocSize,size_t nBlockSize){
+        assert(nAllocSize>=sizeof(Obj));
+        assert(nBlockSize>1);
+        //alloc的自由链表的设计思想是借用对象的前4个字节(32位系统上)来作为next指针链接block，如果对象本身大小比4个字节还小，那么必须向上调整对象大小
+        if(nAllocSize<sizeof(Obj))
+            nAllocSize = sizeof(Obj);
+        if(nBlockSize<=1)//blockSize小于等于1让内存池失去了存在的意义
+            nBlockSize = 32;
+        allocSize = nAllocSize;
+        blockSize = nBlockSize;
+        blocks_head = nullptr;
+        free_block_head = nullptr;
+    }
+    FixedAlloc::~FixedAlloc(){
+        deallocateAll();//真正的归还
+    }
+    void FixedAlloc::deallocateAll(){
+        blocks_head->freeDataChain();
+        blocks_head = nullptr;
+        free_block_head = nullptr;
+    }
+    void FixedAlloc::deallocate(void* p){
+        if(p){//归还的block入链，挂在最前面
+            Obj* objptr = static_cast<Obj*>(p);//归还回来的block里面数据已经没有用，直接覆盖，强制转型，作为入链的一个小节点
+            objptr->free_list_link = free_block_head;
+            free_block_head = objptr;
+        }
+    }
+    void* FixedAlloc::allocate(){
+        if(!free_block_head){//内存池中没有未分配的block
+            MemoryPool* p = MemoryPool::create(blocks_head,blockSize,allocSize); 
+            Obj* objptr = static_cast<Obj*>(p->data());//MemoryPool挖出的一大块的前几个字节是记录信息作用(一个MemoryPool对象)
+            free_block_head = objptr;
+            Obj* temp;
+            for(size_t i=0;i!=blockSize-1;++i){//将所有block链起来
+                temp = reinterpret_cast<Obj*>(reinterpret_cast<char*>(objptr)+allocSize);//每一个入链的小节点大小都是allocSize
+                objptr->free_list_link =temp;
+                objptr = temp;
+            }
+            objptr->free_list_link = nullptr;//最后一个block的指针指向nullptr
+        }
+        void* p = free_block_head;//将第一个区块分配出去
+        free_block_head = free_block_head->free_list_link;//free_block_head指向剩下的区块头
+        return p;
+    }
+`````
+　　FixedAlloc类对外提供接口，FixedAlloc类需要的内存从MemoryPool类拿，MemoryPool类通过create函数申请一大块，FixedAlloc类拿到这一大块之后进行切割，形成一个自由链表，然后从这个自由链表中分配一块给用户。
+
+　　fixed_alloc.h文件中有一处简单说明下，就是标注了[1]的地方。这个union对象的存在就是前面提到的，为了借用对象本身的内存来作为指向下一个小区块的指针，从而形成自由链表来进行内存管理。因为对象归还后，对象内是什么已经不重要了，所以我们直接覆盖对象数据，强制转型为Obj类型的指针指向这个区块。
+
+　　做这么多主要还是为了把内存分配的功能封装起来，通过以上，这部分工作基本完成。那么怎么使用这个分配器呢？拿之前的Foo类继续做改造。
+
+`````C++
+    //advanced_foo.h
+    #include"fixed_alloc.h"
+    class Foo{
+        private:
+            int i;
+        public:
+            Foo(int x):i(x){}
+            int get(){
+                return i;
+            }
+            static void* operator new(size_t size);
+            static void operator delete(void*p,size_t size);
+        protected:
+            static FixedAlloc alloc;
+    };
+
+    //advanced_foo.cpp
+    FixedAlloc Foo::alloc(sizeof(Foo),64);
+    void* Foo::operator new(size_t size){
+        if(sizeof(Foo)!=size)
+            return ::operator new(size);
+        return alloc.allocate();
+    }
+    void Foo::operator delete(void*p,size_t size){
+        if(p==nullptr)//C++保证删除null指针永远安全
+            return;
+        if(size!=sizeof(Foo)){//谁分配，谁归还（如果是global operator new分配的内存就应该由global operator delete归还）
+            ::operator delete(p);
+            return;
+        }
+        return alloc.deallocate(p);
+    }
+`````
+
+　　哇，果然设计上干净了跟多。具体的类只需要关心自己的要做什么就行了，内存管理的事已经交由alloc来做了。
+
+　　做了一个简单测试，结果如下：
+
+`````C++
+    ==4814== Memcheck, a memory error detector
+    ==4814== Copyright (C) 2002-2012, and GNU GPL'd, by Julian Seward et al.
+    ==4814== Using Valgrind-3.8.1 and LibVEX; rerun with -h for copyright info
+    ==4814== Command: ./main
+    ==4814== 
+    Begin clock=660000 End clock=1370000 每次创建1000个Foo对象，然后删除，循环1000次，使用内存分配器的情况下，使用了 710000clocks.
+    Begin clock=1380000 End clock=4370000 每次创建1000个Foo对象，然后删除，循环1000次，不使用内存分配器的情况下，使用了 2990000clocks.
+    ==4814== 
+    ==4814== HEAP SUMMARY:
+    ==4814==     in use at exit: 0 bytes in 0 blocks
+    ==4814==   total heap usage: 1,000,016 allocs, 1,000,016 frees, 4,004,160 bytes allocated
+    ==4814== 
+    ==4814== All heap blocks were freed -- no leaks are possible
+    ==4814== 
+    ==4814== For counts of detected and suppressed errors, rerun with: -v
+    ==4814== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0) 
+`````
+
+　　从上面的测试结果来看，首先没有内存泄露，程序总是应该先写对再去考虑性能的。。。其次，选用了一个简单的用例，从输出的两行来看，内存分配器还是起作用了，效果还行，更进一步的性能测试我就不做了。
 
 
-### 5. 其他
-　　//to do
+### 6. 总结
+　　这篇博客利用上一篇博客-原语篇讲到的重载member operator new/delete为特定类实现了内存管理，先给出了一个简单的per-class allocation的实现，然后一步步做了一些改进，最后实现了一个简单的内存池：固定大小的内存分配器。
