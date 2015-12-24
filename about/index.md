@@ -11,7 +11,6 @@ comments: no
 ###联系方式：
 
 {% if site.qq %}
-ＱＱ：[{{ site.qq }}](tencent://message/?uin={{ site.qq }})
 {% endif %}
 
 邮箱：[{{ site.email }}](mailto:{{ site.email }})
