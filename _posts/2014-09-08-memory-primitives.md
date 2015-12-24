@@ -7,8 +7,7 @@ tags:
 - memory management  
 - memory primitives
 ---
-##目录
-* TOC
+- 目录
 {:toc}
 
 ### 1. 说明

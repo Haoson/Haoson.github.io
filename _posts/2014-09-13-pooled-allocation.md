@@ -7,8 +7,7 @@ tags:
 - memory management  
 - pooled allocation
 ---
-##目录
-* TOC
+- 目录
 {:toc}
 
 ### 1. 说明

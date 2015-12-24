@@ -7,8 +7,7 @@ tags:
 - optimization
 - mobile game
 ---
-##目录
-* TOC
+- 目录
 {:toc}
 
 ### 1. 移动网络的弱点
