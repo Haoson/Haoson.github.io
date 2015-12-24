@@ -33,7 +33,7 @@ tags:
             //内存分配失败的时候将不执行构造函数，直接抛出异常
         }
 
-　　也就是说，调用new的时候，由三步组成，一是调用operator new分配内存，第二是编译器对指针做转型，第三是调用构造函数。
+　　也就是说，调用new的时候，由三步组成，一是调用operator new分配内存，第二是编译器对指针做转型，第三是调用构造函数。<br>
 　　对于delete操作符，当我们调用如下代码时：
 
         Complex* cptr  = new Complex(1,2);
@@ -45,7 +45,7 @@ tags:
         cptr->~Complex();
         ::operator delete(cptr);
 
-　　也就是说，调用delete的时候，由两步组成，先调用析构函数，然后释放内存。
+　　也就是说，调用delete的时候，由两步组成，先调用析构函数，然后释放内存。<br>
 　　按照上面的叙述，做如下实验验证。
 
         #include<iostream>
@@ -121,9 +121,10 @@ tags:
 * 安装另一个new handler
 * 丢出一个exception，类型为bad_alloc或者其衍生类型
 * 直接调用abort或者exit
-　　缺省的operator new和operator delete具有非常好的通用性，它的这种灵活性也使得在某些特定的场合下，可以进一步改善它的性能。尤其在那些需要动态分配大量的但很小的对象的应用程序里，情况更是如此。所以从效率上来讲,class可以接管内存管理责任，对operator new进行类重载。
-　　如果对operator new进行了类重载，也要对operator delete也要进行重载，关于这点，可以参见侯捷老师翻译的《Effective C++》第十条。
-　　关于如何对operator new/delete进行类重载，下一篇内存管理：自己动手写内存池会详细写到，这里暂时不详述。这里提一个小细节，类重载operator new/delete函数的时候，重载函数应该是static类型，因为当我们new一个对象的时候，根据new的底层实现可知，new第一步其实是调用了operator new，那么当我们重载了operator new，第一步就会调用我们重载的operator new函数，此时对象还没有分配内存以及初始化，也就是说对象此时还不存在，所以也不存在利用对象来调用函数，只能通过类调用，所以operator new重载函数应该是static类型。不过很多时候，我们知道static可以不写，这是因为编译器帮我们做了优化，你不写编译器就帮你加上，不过我们心里应该清楚这里是需要加上static的。
+
+　　缺省的operator new和operator delete具有非常好的通用性，它的这种灵活性也使得在某些特定的场合下，可以进一步改善它的性能。尤其在那些需要动态分配大量的但很小的对象的应用程序里，情况更是如此。所以从效率上来讲,class可以接管内存管理责任，对operator new进行类重载。<br>
+　　如果对operator new进行了类重载，也要对operator delete也要进行重载，关于这点，可以参见侯捷老师翻译的《Effective C++》第十条。<br>
+　　关于如何对operator new/delete进行类重载，下一篇内存管理：自己动手写内存池会详细写到，这里暂时不详述。这里提一个小细节，类重载operator new/delete函数的时候，重载函数应该是static类型，因为当我们new一个对象的时候，根据new的底层实现可知，new第一步其实是调用了operator new，那么当我们重载了operator new，第一步就会调用我们重载的operator new函数，此时对象还没有分配内存以及初始化，也就是说对象此时还不存在，所以也不存在利用对象来调用函数，只能通过类调用，所以operator new重载函数应该是static类型。不过很多时候，我们知道static可以不写，这是因为编译器帮我们做了优化，你不写编译器就帮你加上，不过我们心里应该清楚这里是需要加上static的。<br>
 
 
 ### 5. placement new/delete底层实现
@@ -147,12 +148,12 @@ tags:
             f->~Fred();   // 显示调用对象的析构函数
         } 
 
-　　一般来说，我们应该尽可能不使用placement new，除非我们真的很关心创建的对象在内存中的位置，for example，when your hardware has a memory-mapped I/O timer device, and you want to place a Clock object at that memory location[^2]。还有，我们使用placement new构造对象，当对象调用结束后，我们需要显示的调用对象的析构函数。最最重要的是，一旦我们使用operator new之后，也就意味着我们接管了传给placement new的指针所指的内存区块的职责，这里有两个职责，一是内存区域是否足够容纳对象；二是如果区域是否满足字节对齐（如果对象需要字节对齐）。
-　　还要注意的是，在C++标准中，对于placement operator new []有如下的说明： placement operator new[] needs implementation-defined amount of additional storage to save a size of array. 所以我们必须申请比原始对象大小多出sizeof(int)个字节来存放对象的个数，或者说数组的大小。
+　　一般来说，我们应该尽可能不使用placement new，除非我们真的很关心创建的对象在内存中的位置，for example，when your hardware has a memory-mapped I/O timer device, and you want to place a Clock object at that memory location[^2]。还有，我们使用placement new构造对象，当对象调用结束后，我们需要显示的调用对象的析构函数。最最重要的是，一旦我们使用operator new之后，也就意味着我们接管了传给placement new的指针所指的内存区块的职责，这里有两个职责，一是内存区域是否足够容纳对象；二是如果区域是否满足字节对齐（如果对象需要字节对齐）。<br>
+　　还要注意的是，在C++标准中，对于placement operator new []有如下的说明： placement operator new[] needs implementation-defined amount of additional storage to save a size of array. 所以我们必须申请比原始对象大小多出sizeof(int)个字节来存放对象的个数，或者说数组的大小。<br>
 
 ### 6. array new/delete底层实现
-　　当使用new分配数组的时候，原理基本同new操作符，不过分配内存是调用operator new[]（即array new），array new能被重载，分配完内存之后，在数组里的每一个对象的构造函数都会被调用。这里唯一需要注意的是编译器只会调用无参的构造函数，这里无法通过参数给予对象初值。
-　　当delete操作符用于数组时，它为每个数组元素调用析构函数，然后调用operator delete[](即array delete)来释放内存。array delete同样能被重载。
+　　当使用new分配数组的时候，原理基本同new操作符，不过分配内存是调用operator new[]（即array new），array new能被重载，分配完内存之后，在数组里的每一个对象的构造函数都会被调用。这里唯一需要注意的是编译器只会调用无参的构造函数，这里无法通过参数给予对象初值。<br>
+　　当delete操作符用于数组时，它为每个数组元素调用析构函数，然后调用operator delete[](即array delete)来释放内存。array delete同样能被重载。<br>
 　　对于array new/delete，源码如下：
 
         void* operator new[] (std::size_t sz) _GLIBCXX_THROW (std::bad_alloc){
@@ -162,7 +163,7 @@ tags:
             ::operator delete (ptr);
         }
 
-　　可以看到，array new/delete底层实质上还是调用operator new/delete来分配空间。
+　　可以看到，array new/delete底层实质上还是调用operator new/delete来分配空间。<br>
 　　这里提一个小细节，如果我们new数组之后使用delete ptr;(没有那个中括号)会发生什么呢？从上面的源代码可以看到，array delete底层还是调用::operator delete来释放内存的，参数是指向将要释放的区块的开始地址，所以分配的内存一定是会正确释放的，不可能有内存泄露。前面提到delete数组时候，第一步是为每个数组元素调用析构函数，如果我们delete数组时候忘记写中括号，那么编译器认为这是一个对象，编译器就会调用第一个元素的析构元素，其余元素的析构函数将不会被调用。
 
 ### 7. 其他
@@ -181,9 +182,9 @@ tags:
             return static_cast<unsigned char*>(mem)+sizeof(int);
         }
 
-可以看到上述代码返回的其实并不是一个得自malloc的指针，这个指针可能就是一个没有适当对齐的指针。所以重载operator new（包括placement new）都需要格外小心。
-　　第二点，从上面的介绍可知，new/delete,operator new/delete或者array new/delete等实质上都是调用malloc/free来分配/释放空间，对于malloc和free的底层实现，后续文章再做分析。
-　　第三点，一个小细节，释放空间的时候，我们注意到free只需要一个指针参数，指向要释放的区块的开始地址，那么释放空间的时候怎么知道释放的空间大小呢？这里简单说一下，分配内存的时候，会记录一个cooike，cooike记录了分配内存的大小，一般来说，这个cookie放在区块开始地址的"上面"，释放的时候只需要根据开始地址再向上找4个字节就能得到区块大小...
+可以看到上述代码返回的其实并不是一个得自malloc的指针，这个指针可能就是一个没有适当对齐的指针。所以重载operator new（包括placement new）都需要格外小心。<br>
+　　第二点，从上面的介绍可知，new/delete,operator new/delete或者array new/delete等实质上都是调用malloc/free来分配/释放空间，对于malloc和free的底层实现，后续文章再做分析。<br>
+　　第三点，一个小细节，释放空间的时候，我们注意到free只需要一个指针参数，指向要释放的区块的开始地址，那么释放空间的时候怎么知道释放的空间大小呢？这里简单说一下，分配内存的时候，会记录一个cooike，cooike记录了分配内存的大小，一般来说，这个cookie放在区块开始地址的"上面"，释放的时候只需要根据开始地址再向上找4个字节就能得到区块大小...<br>
 
 ### 8. 总结
 　　这篇博客主要介绍了C++内存分配中的一些基本原语的底层实现和一些要注意的点，下一篇我将利用这些原语实现一个自己的内存池。
