@@ -14,7 +14,7 @@ email: haoweiqinghaoson@gmail.com
 weibo: 2068614947
 github: Haoson
 duoshuo: haoson
-highlighter: pygments
+highlighter: rouge 
 safe: true
 paginate: 20
 about: "这里是Haoson 的个人博客,这里主要记录和C++相关的博客，也有个人生活方面的博客，切换到分类模式可以更快地找到感兴趣的内容，欢迎建议、拍砖……"
